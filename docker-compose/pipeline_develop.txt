@@ -35,7 +35,7 @@ pipeline {
                     def currentTimeMillis = System.currentTimeMillis()
                     
                     if (version.endsWith("-SNAPSHOT")) {
-                        def target = "imolasportiva-snapshot/" + groupId + "/" + artifactId + "/" + version + "/" + artifactId + "-" + version + "-" + currentTimeMillis + ".jar"
+                        def target = "imolasportiva-snapshot/" + groupId + "/" + artifactId + "-" + version + "-" + currentTimeMillis + ".jar"
                     
                         def uploadSpec = """
                     {
@@ -50,7 +50,7 @@ pipeline {
                         
                         rtUpload serverId: 'artifactory', spec: uploadSpec
                 } else {
-                   def target = "imolasportiva-release/" + groupId + "/" + artifactId + "/" + version + "/" + artifactId + "-" + version + "-" + currentTimeMillis + ".jar"
+                        def target = "imolasportiva-release/" + groupId + "/" + artifactId + "-" + version + ".jar"
                     
                         def uploadSpec = """
                     {
