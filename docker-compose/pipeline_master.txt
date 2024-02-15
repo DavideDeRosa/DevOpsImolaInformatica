@@ -1,0 +1,77 @@
+pipeline {
+    agent any
+
+    tools {
+        // Install the Maven version configured as "M3" and add it to the path.
+        maven "m3"
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                git branch: 'master', url: "https://github.com/DavideDeRosa/imolasportiva/"
+
+                sh "mvn clean install -DskipTests"
+            }
+
+            post {
+                success {
+                    echo "success"
+                    
+                    sh 'mvn --version'
+                script{
+                    def pomXml = readFile('pom.xml')
+                    def groupId = pomXml =~ '<groupId>(.*?)</groupId>'
+                    def artifactId = pomXml =~ '<artifactId>(.*?)</artifactId>'
+                    def version = pomXml =~ '<version>(.*?)</version>'
+                    groupId = groupId ? groupId[0][1] : ''
+                    artifactId = artifactId ? artifactId[0][1] : ''
+                    version = version ? version[0][1] : ''
+                    
+                    echo "Maven coordinates - GroupId: ${groupId}, ArtifactId: ${artifactId}, Version: ${version}"
+                    
+                    groupId = groupId.replace('.', '/')
+                    
+                    def currentTimeMillis = System.currentTimeMillis()
+                    
+                    if (version.endsWith("-SNAPSHOT")) {
+                        def target = "imolasportiva-snapshot/" + groupId + "/" + artifactId + "/" + version + "/" + artifactId + "-" + version + "-" + currentTimeMillis + ".jar"
+                    
+                        def uploadSpec = """
+                    {
+                        "files": [
+                            {
+                                "pattern": "target/*.jar",
+                                "target": "${target}"
+                            }
+                        ]
+                    }
+                    """
+                        
+                        rtUpload serverId: 'artifactory', spec: uploadSpec
+                } else {
+                   def target = "imolasportiva-release/" + groupId + "/" + artifactId + "/" + version + "/" + artifactId + "-" + version + "-" + currentTimeMillis + ".jar"
+                    
+                        def uploadSpec = """
+                    {
+                        "files": [
+                            {
+                                "pattern": "target/*.jar",
+                                "target": "${target}"
+                            }
+                        ]
+                    }
+                    """
+                        
+                        rtUpload serverId: 'artifactory', spec: uploadSpec
+                }
+                }
+                }
+                
+                failure{
+                    echo "failure"
+                }
+            }
+        }
+    }
+}
