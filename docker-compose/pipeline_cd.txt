@@ -1,0 +1,30 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Preparations') {
+            steps {
+                //rimozione vecchi file
+                sh "rm -rf /var/jenkins_home/workspace/imolasportiva/CD_imolasportiva/DevOpsImolaInformatica"
+                sh "rm -rf /var/jenkins_home/workspace/imolasportiva/CD_imolasportiva/imolasportiva"
+                sh "rm -rf /var/jenkins_home/workspace/imolasportiva/CD_imolasportiva/imolasportiva.zip"
+                
+                //download cartella docker
+                sh "git clone https://github.com/DavideDeRosa/DevOpsImolaInformatica.git"
+                
+                //copia file necessari in un'altra directory
+                sh "cp -r /var/jenkins_home/workspace/imolasportiva/CD_imolasportiva/DevOpsImolaInformatica/imolasportiva /var/jenkins_home/workspace/imolasportiva/CD_imolasportiva/"
+                
+                //download file jar e properties
+                sh "curl -u 'imola:Imola001!' --location 'http://artifactory:8082/artifactory/${url_jar}' --output /var/jenkins_home/workspace/imolasportiva/CD_imolasportiva/imolasportiva/springboot/imolasportiva.jar"
+                sh "curl --location '${url_properties}' --output /var/jenkins_home/workspace/imolasportiva/CD_imolasportiva/imolasportiva/springboot/application.properties"
+                
+                //zip dei file
+                sh "apt-get update"
+                sh "apt-get install -y zip"
+                sh "cd /var/jenkins_home/workspace/imolasportiva/CD_imolasportiva"
+                sh "zip -r imolasportiva.zip imolasportiva/*"
+            }
+        }
+    }
+}
