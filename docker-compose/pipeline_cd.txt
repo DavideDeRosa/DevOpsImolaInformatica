@@ -2,13 +2,26 @@ pipeline {
     agent any
 
     stages {
-        stage('Preparations') {
+        stage('Clean') {
             steps {
                 //rimozione vecchi file
                 sh "rm -rf /var/jenkins_home/workspace/imolasportiva/CD_imolasportiva/DevOpsImolaInformatica"
                 sh "rm -rf /var/jenkins_home/workspace/imolasportiva/CD_imolasportiva/imolasportiva"
                 sh "rm -rf /var/jenkins_home/workspace/imolasportiva/CD_imolasportiva/imolasportiva.zip"
-                
+            }
+        }
+        
+        stage('Prepare'){
+            steps{
+                //zip dei file
+                sh "apt-get update"
+                sh "apt-get install -y zip"
+                sh "apt-get install sshpass"
+            }
+        }
+        
+        stage('Download'){
+            steps{
                 //download cartella docker
                 sh "git clone https://github.com/DavideDeRosa/DevOpsImolaInformatica.git"
                 
@@ -18,12 +31,58 @@ pipeline {
                 //download file jar e properties
                 sh "curl -u 'imola:Imola001!' --location 'http://artifactory:8082/artifactory/${url_jar}' --output /var/jenkins_home/workspace/imolasportiva/CD_imolasportiva/imolasportiva/springboot/imolasportiva.jar"
                 sh "curl --location '${url_properties}' --output /var/jenkins_home/workspace/imolasportiva/CD_imolasportiva/imolasportiva/springboot/application.properties"
-                
-                //zip dei file
-                sh "apt-get update"
-                sh "apt-get install -y zip"
+            }
+        }
+        
+        stage('Package'){
+            steps{
                 sh "cd /var/jenkins_home/workspace/imolasportiva/CD_imolasportiva"
                 sh "zip -r imolasportiva.zip imolasportiva/*"
+            }
+        }
+        
+        stage('Deliver'){ 
+            steps{ 
+                script{ 
+                    def output = sh(script: 'sshpass -p "1234" scp /var/jenkins_home/workspace/imolasportiva/CD_imolasportiva/imolasportiva.zip imolasportiva@192.168.64.2:imolasportiva/', returnStdout: true) 
+                    echo output 
+                } 
+            } 
+        }
+        
+        stage('Teardown'){
+            steps{
+                script{
+                    sh """sshpass -p 1234 ssh -p 22 imolasportiva@192.168.64.2 << EOF 
+                    cd imolasportiva/
+                    if [ -d "imolasportiva/springboot" ]; then cd imolasportiva/ && docker-compose down; fi
+                    exit
+                    EOF"""
+                }
+            }
+        }
+        
+        stage('Deploy'){
+            steps{
+                script{
+                    sh """sshpass -p 1234 ssh -p 22 imolasportiva@192.168.64.2 << EOF 
+                    cd imolasportiva/
+                    rm -rf imolasportiva/
+                    unzip -o imolasportiva.zip
+                    cd imolasportiva/
+                    ls -la
+                    docker-compose build
+                    docker-compose up -d
+                    exit
+                    EOF"""
+                }
+            }
+        }
+        
+        stage('House Keeping'){
+            steps{
+                sh "rm -rf /var/jenkins_home/workspace/imolasportiva/CD_imolasportiva/DevOpsImolaInformatica"
+                sh "rm -rf /var/jenkins_home/workspace/imolasportiva/CD_imolasportiva/imolasportiva"
             }
         }
     }
