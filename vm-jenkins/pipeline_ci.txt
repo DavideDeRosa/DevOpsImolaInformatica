@@ -1,0 +1,61 @@
+pipeline {
+    agent any
+    
+    tools{
+        maven "m3"
+    }
+    
+    environment{
+        DOCKERHUB_CREDENTIALS = credentials("dockerhub-imolasportiva")
+    }
+    
+    stages {
+        stage('Git') {
+            steps {
+                git branch: "${branch}", url: "https://github.com/DavideDeRosa/imolasportiva/"
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                sh "mvn clean install -DskipTests"
+            }
+        }
+        
+        stage('Download Dockerfile and properties') {
+            steps {
+                sh "curl --location '${dockerfile_url}' --output /home/jenkins_home/jenkins/workspace/imolasportiva/CI_imolasportiva/Dockerfile"
+                sh "curl --location '${properties_url}' --output /home/jenkins_home/jenkins/workspace/imolasportiva/CI_imolasportiva/application.properties"
+            }
+        }
+        
+        stage('Copy .jar') {
+            steps {
+                sh "cp -r /home/jenkins_home/jenkins/workspace/imolasportiva/CI_imolasportiva/target/*.jar /home/jenkins_home/jenkins/workspace/imolasportiva/CI_imolasportiva/"
+                sh "mv *.jar imolasportiva.jar"
+            }
+        }
+        
+        stage('Docker Login') {
+            steps {
+                sh "echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin"
+            }
+        }
+        
+        stage('Docker Build and Push') {
+            steps {
+                sh "docker build -t davidederosa24/imolasportiva:latest ."
+                sh "docker push davidederosa24/imolasportiva:latest"
+            }
+        }
+    }
+    
+    post{
+        always{
+            sh "docker logout"
+            sh "rm -rf /home/jenkins_home/jenkins/workspace/imolasportiva/CI_imolasportiva/*.jar"
+            sh "rm -rf /home/jenkins_home/jenkins/workspace/imolasportiva/CI_imolasportiva/Dockerfile"
+            sh "rm -rf /home/jenkins_home/jenkins/workspace/imolasportiva/CI_imolasportiva/application.properties"
+        }
+    }
+}
