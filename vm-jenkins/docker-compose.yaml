@@ -14,7 +14,7 @@ services:
       - ./sql/:/docker-entrypoint-initdb.d/
 
   app:
-    image: 'davidederosa24/imolasportiva:latest'
+    image: 'davidederosa24/imolasportiva:${tag}'
     container_name: imolasportiva
     depends_on:
       - db

@@ -1,3 +1,7 @@
+import java.time.format.DateTimeFormatter
+import java.time.ZonedDateTime
+import java.time.ZoneOffset
+
 pipeline {
     agent any
     
@@ -7,6 +11,7 @@ pipeline {
     
     environment{
         DOCKERHUB_CREDENTIALS = credentials("dockerhub-imolasportiva")
+        JENKINS_PATH = "/home/jenkins_home/jenkins/workspace/imolasportiva/CI_imolasportiva"
     }
     
     stages {
@@ -24,14 +29,14 @@ pipeline {
         
         stage('Download Dockerfile and properties') {
             steps {
-                sh "curl --location '${dockerfile_url}' --output /home/jenkins_home/jenkins/workspace/imolasportiva/CI_imolasportiva/Dockerfile"
-                sh "curl --location '${properties_url}' --output /home/jenkins_home/jenkins/workspace/imolasportiva/CI_imolasportiva/application.properties"
+                sh "curl --location '${dockerfile_url}' --output ${JENKINS_PATH}/Dockerfile"
+                sh "curl --location '${properties_url}' --output ${JENKINS_PATH}/application.properties"
             }
         }
         
         stage('Copy .jar') {
             steps {
-                sh "cp -r /home/jenkins_home/jenkins/workspace/imolasportiva/CI_imolasportiva/target/*.jar /home/jenkins_home/jenkins/workspace/imolasportiva/CI_imolasportiva/"
+                sh "cp -r ${JENKINS_PATH}/target/*.jar ${JENKINS_PATH}/"
                 sh "mv *.jar imolasportiva.jar"
             }
         }
@@ -44,8 +49,28 @@ pipeline {
         
         stage('Docker Build and Push') {
             steps {
-                sh "docker build -t davidederosa24/imolasportiva:latest ."
-                sh "docker push davidederosa24/imolasportiva:latest"
+                script{
+                    def pomXml = readFile('pom.xml')
+                    def version = pomXml =~ '<version>(.*?)</version>'
+                    version = version ? version[0][1] : ''
+                    
+                    echo "Version: ${version}"
+                    
+                    def formattedDate = ZonedDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+                    
+                    version = version.replaceAll('-SNAPSHOT', '')
+                    
+                    def tag = version + "-" + formattedDate
+                    
+                    echo "${tag}"
+                    
+                    sh "docker build -t davidederosa24/imolasportiva:${tag} ."
+                    sh "docker build -t davidederosa24/imolasportiva:latest ."
+                    sh "docker push davidederosa24/imolasportiva:${tag}"
+                    sh "docker push davidederosa24/imolasportiva:latest"
+                    
+                    sh "docker rmi -f \$(docker images -a -q)"
+                }
             }
         }
     }
@@ -53,9 +78,9 @@ pipeline {
     post{
         always{
             sh "docker logout"
-            sh "rm -rf /home/jenkins_home/jenkins/workspace/imolasportiva/CI_imolasportiva/*.jar"
-            sh "rm -rf /home/jenkins_home/jenkins/workspace/imolasportiva/CI_imolasportiva/Dockerfile"
-            sh "rm -rf /home/jenkins_home/jenkins/workspace/imolasportiva/CI_imolasportiva/application.properties"
+            sh "rm -rf ${JENKINS_PATH}/*.jar"
+            sh "rm -rf ${JENKINS_PATH}/Dockerfile"
+            sh "rm -rf ${JENKINS_PATH}/application.properties"
         }
     }
 }
