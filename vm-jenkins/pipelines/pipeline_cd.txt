@@ -1,0 +1,82 @@
+pipeline {
+    agent any
+    
+    tools{
+        maven "m3"
+    }
+    
+    environment{
+        DOCKERHUB_CREDENTIALS = credentials("dockerhub-imolasportiva")
+        JENKINS_PATH = "/home/jenkins_home/jenkins/workspace/imolasportiva/CD_imolasportiva"
+    }
+    
+    stages {
+        stage('Git') {
+            steps {
+                git branch: "main", url: "https://github.com/DavideDeRosa/DevOpsImolaInformatica/"
+            }
+        }
+        
+        stage('Remove useless files') {
+            steps {
+                sh "rm -rf ${JENKINS_PATH}/docker-compose"
+                sh "rm -rf ${JENKINS_PATH}/imolasportiva"
+            }
+        }
+        
+        stage('Package') {
+            steps {
+                sh "rm -rf ${JENKINS_PATH}/vm-jenkins/pipelines"
+                sh "cd ${JENKINS_PATH}/"
+                sh "zip -r imolasportiva.zip vm-jenkins/*"
+            }
+        }
+        
+        stage('Sending zip'){ 
+            steps{ 
+                script{ 
+                    def output = sh(script: 'sshpass -p "1234" scp ${JENKINS_PATH}/imolasportiva.zip imolasportiva@192.168.64.2:imolasportiva_dockerhub/', returnStdout: true) 
+                    echo output
+                } 
+            } 
+        }
+        
+        stage('Teardown'){
+            steps{
+                script{
+                    sh """sshpass -p 1234 ssh -p 22 imolasportiva@192.168.64.2 << EOF 
+                    cd imolasportiva_dockerhub/
+                    if [ -d "vm-jenkins/sql" ]; then cd vm-jenkins/ && docker-compose down; fi
+                    exit
+                    EOF"""
+                }
+            }
+        }
+        
+        stage('Deploy'){
+            steps{
+                script{
+                    sh """sshpass -p 1234 ssh -p 22 imolasportiva@192.168.64.2 << EOF 
+                    cd imolasportiva_dockerhub/
+                    rm -rf vm-jenkins/
+                    unzip -o imolasportiva.zip
+                    cd vm-jenkins/
+                    ls -la
+                    echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
+                    TAG=latest docker-compose up -d
+                    cd ..
+                    rm imolasportiva.zip
+                    exit
+                    EOF"""
+                }
+            }
+        }
+        
+        stage('House keeping') {
+            steps {
+                sh "rm -rf ${JENKINS_PATH}/vm-jenkins"
+                sh "rm -rf ${JENKINS_PATH}/imolasportiva.zip"
+            }
+        }
+    }
+}
