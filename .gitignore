@@ -2,3 +2,4 @@ artifactory/
 jenkins_compose/
 
 **/.DS_Store
+vm-jenkins/db_password.txt
