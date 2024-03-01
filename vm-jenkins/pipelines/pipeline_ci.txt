@@ -12,6 +12,7 @@ pipeline {
     environment{
         DOCKERHUB_CREDENTIALS = credentials("dockerhub-imolasportiva")
         JENKINS_PATH = "/home/jenkins_home/jenkins/workspace/imolasportiva/CI_imolasportiva"
+        SCANNER_HOME = tool 'sonarscanner'
     }
     
     stages {
@@ -24,6 +25,18 @@ pipeline {
         stage('Build') {
             steps {
                 sh "mvn clean install"
+            }
+        }
+        
+        stage('SonarQube') {
+            steps {
+                withSonarQubeEnv('sonarqube_imolasportiva'){
+                    sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=imolasportiva \
+                    -Dsonar.java.binaries=. \
+                    -Dsonar.projectKey=imolasportiva '''
+                }
+                
+                waitForQualityGate abortPipeline: true
             }
         }
         
@@ -69,7 +82,8 @@ pipeline {
                     sh "docker push davidederosa24/imolasportiva:${tag}"
                     sh "docker push davidederosa24/imolasportiva:latest"
                     
-                    sh "docker rmi -f \$(docker images -a -q)"
+                    sh "docker rmi -f davidederosa24/imolasportiva:${tag}"
+                    sh "docker rmi -f davidederosa24/imolasportiva:latest"
                 }
             }
         }
