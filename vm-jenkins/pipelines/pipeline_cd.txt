@@ -7,6 +7,9 @@ pipeline {
     
     environment{
         DOCKERHUB_CREDENTIALS = credentials("dockerhub-imolasportiva")
+        PASSWORD_VM = credentials("password_vm")
+        USERNAME_VM_DEPLOY = credentials("username_vm_deploy")
+        IP_VM_DEPLOY = credentials("ip_vm_deploy")
         JENKINS_PATH = "/home/jenkins_home/jenkins/workspace/imolasportiva/CD_imolasportiva"
     }
     
@@ -35,7 +38,7 @@ pipeline {
         stage('Sending zip'){ 
             steps{ 
                 script{ 
-                    def output = sh(script: 'sshpass -p "1234" scp ${JENKINS_PATH}/imolasportiva.zip imolasportiva@192.168.64.2:imolasportiva_dockerhub/', returnStdout: true) 
+                    def output = sh(script: 'sshpass -p "$PASSWORD_VM" scp ${JENKINS_PATH}/imolasportiva.zip $USERNAME_VM_DEPLOY@$IP_VM_DEPLOY:imolasportiva_dockerhub/', returnStdout: true) 
                     echo output
                 } 
             } 
@@ -44,7 +47,7 @@ pipeline {
         stage('Teardown'){
             steps{
                 script{
-                    sh """sshpass -p 1234 ssh -p 22 imolasportiva@192.168.64.2 << EOF 
+                    sh """sshpass -p $PASSWORD_VM ssh -p 22 $USERNAME_VM_DEPLOY@$IP_VM_DEPLOY << EOF 
                     cd imolasportiva_dockerhub/
                     if [ -d "vm-jenkins/sql" ]; then cd vm-jenkins/ && docker-compose down; fi
                     exit
@@ -56,7 +59,7 @@ pipeline {
         stage('Deploy'){
             steps{
                 script{
-                    sh """sshpass -p 1234 ssh -p 22 imolasportiva@192.168.64.2 << EOF 
+                    sh """sshpass -p $PASSWORD_VM ssh -p 22 $USERNAME_VM_DEPLOY@$IP_VM_DEPLOY << EOF 
                     cd imolasportiva_dockerhub/
                     rm -rf vm-jenkins/
                     unzip -o imolasportiva.zip
